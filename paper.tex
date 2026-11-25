@@ -1,0 +1,314 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{hyperref}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  citecolor=blue,
+  urlcolor=blue
+}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\oeis}[1]{\href{https://oeis.org/#1}{\texttt{#1}}}
+
+\title{Large-Order Asymptotics and Positivity of the Coefficients\\
+in the Asymptotic Expansion of OEIS A336293\\
+(OEIS A395976 and A395977)}
+
+\author{Le Duy Phuc\thanks{Email: \href{mailto:leduyphuc1702@gmail.com}{\texttt{leduyphuc1702@gmail.com}}}}
+\date{November 25, 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+The sequence $a_m=\sum_{k=0}^m\binom mk^2\binom{2k}k(m-k)!$ (\oeis{A336293}) has a complete asymptotic expansion
+$a_m\sim m^m e^{4\sqrt m-m-2}(8\pi)^{-1/2}\sum_{j\ge0}d_jm^{-j/2}$ with rational coefficients $d_j$, whose numerators and denominators are \oeis{A395976} and \oeis{A395977}. We answer both open questions recorded in these entries. First, we prove Vaclav Kotesovec's conjecture of May 21, 2026,
+\[
+  d_j\sim\frac{2e^2}{\pi}\,\frac{\Gamma(j)}{4^j}\sim\frac{j^{\,j-1/2}}{\sqrt\pi\,2^{2j-3/2}\,e^{\,j-2}}\qquad(j\to\infty),
+\]
+by a saddle-point representation of the coefficients followed by a dominated-convergence argument in the order of the expansion. Second, we prove that $d_j>0$ for every $j\ge6$, which answers the question ``For $n>5$, are all $a(n)$ positive?'' in \oeis{A395976}. The positivity proof is computer-assisted: it combines an exact linear recurrence for $d_j$, finitely many exact rational certificates, and a uniform analytic bound for the infinite tail. All computations use exact rational arithmetic and are reproducible with the accompanying Python scripts.
+\end{abstract}
+
+\noindent\textbf{MSC 2020:} 41A60, 05A16, 33C10.\\
+\textbf{Keywords:} asymptotic expansion, large-order behaviour, saddle-point method, modified Bessel function, computer-assisted proof, OEIS A336293, OEIS A395976, OEIS A395977.
+
+\section{Introduction}
+
+Let
+\[
+  a_m=\oeis{A336293}(m)=\sum_{k=0}^m\binom mk^2\binom{2k}k(m-k)!,\qquad m\ge0 .
+\]
+Kotesovec recorded in the OEIS~\cite{OEIS} the leading asymptotic $a_m\sim m^me^{4\sqrt m-m-2}(8\pi)^{-1/2}\bigl(1+\tfrac{55}{24\sqrt m}\bigr)$ and the recurrence
+\begin{equation}\label{eq:rec}
+  m\,a_m=(3m^2+m-1)a_{m-1}-(m-1)^2(3m+1)a_{m-2}+(m-2)^2(m-1)^2a_{m-3}.
+\end{equation}
+The full Poincar\'e expansion reads
+\begin{equation}\label{eq:expansion}
+  a_m\sim g(m)\sum_{j\ge0}d_j\,m^{-j/2},\qquad g(m)=\frac{m^me^{4\sqrt m-m-2}}{\sqrt{8\pi}},\qquad d_0=1,
+\end{equation}
+and the numerators and denominators of $d_j$ in lowest terms form \oeis{A395976} and \oeis{A395977}:
+\[
+  d_0,d_1,\dots=1,\ \tfrac{55}{24},\ \tfrac{2581}{1152},\ \tfrac{255893}{414720},\ -\tfrac{4579919}{7962624},\ -\tfrac{1075995491}{6688604160},\ \tfrac{2191041054791}{4815794995200},\ \dots
+\]
+These entries contain two open problems: Kotesovec's conjectured large-order asymptotic for $d_j$ (May 21, 2026), and the question whether all numerators are positive beyond index~5. We settle both.
+
+\begin{theorem}[Large-order asymptotics]\label{thm:asym}
+As $j\to\infty$,
+\[
+  d_j\sim\frac{2e^2}{\pi}\,\frac{\Gamma(j)}{4^j}\sim\frac{j^{\,j-1/2}}{\sqrt\pi\,2^{2j-3/2}\,e^{\,j-2}} .
+\]
+\end{theorem}
+
+The two forms agree by Stirling's formula $\Gamma(j)\sim\sqrt{2\pi}\,j^{j-1/2}e^{-j}$, and the second is exactly Kotesovec's conjecture.
+
+\begin{theorem}[Positivity]\label{thm:pos}
+$d_j>0$ for every integer $j\ge6$. More precisely, with $q_j=4^jd_j/(j-1)!$ for $j\ge1$,
+\[
+  \frac45\le\frac{q_n}{q_{n-1}}\le\frac{13}{10}\qquad(n\ge21).
+\]
+\end{theorem}
+
+Since the denominators in \oeis{A395977} are positive, Theorem~\ref{thm:pos} shows that \oeis{A395976}$(n)>0$ for all $n>5$. Theorem~\ref{thm:asym} alone only gives eventual positivity; Theorem~\ref{thm:pos} is needed to cover every index.
+
+Throughout, the index $m$ of the sequence and the index $j$ of the expansion coefficients are different. Section~\ref{sec:saddle} establishes the fixed-order expansion together with an exact formula for $d_j$; Sections~\ref{sec:uniform}--\ref{sec:stirling} let the order tend to infinity. No interchange of the two limits is assumed. Section~\ref{sec:pos} proves Theorem~\ref{thm:pos}, and Section~\ref{sec:numerics} describes the computations.
+
+\section{Generating function and Bessel coefficients}\label{sec:bessel}
+
+Since the coefficient of $x^k$ in $I_0(2\sqrt x)^2$ is $\binom{2k}k/(k!)^2$, the definition of $a_m$ gives
+\[
+  \sum_{m\ge0}\frac{a_m}{(m!)^2}x^m=e^xI_0(2\sqrt x)^2 .
+\]
+The fixed-order expansion of the modified Bessel function~\cite[10.40.1, 10.17.1]{DLMF} holds uniformly on every closed subsector of $|\arg z|<\pi/2$:
+\[
+  I_0(2z)\sim\frac{e^{2z}}{\sqrt{4\pi z}}\sum_{j\ge0}b_jz^{-j},\qquad b_j=\frac{(1/2)_j^2}{4^jj!}>0 .
+\]
+The gamma-ratio asymptotic gives $b_j\sim\Gamma(j)/(\pi4^j)$, and for $j\ge1$ the ratio $b_j4^j/\Gamma(j)$ is bounded above and below by absolute positive constants. Put $B_j=\sum_{r=0}^jb_rb_{j-r}$, so $B_0=1$. For $j\ge2$,
+\[
+  \sum_{r=1}^{j-1}\frac{\Gamma(r)\Gamma(j-r)}{\Gamma(j)}=\frac1{j-1}\sum_{r=1}^{j-1}\binom{j-2}{r-1}^{-1}=O\!\left(\frac1j\right),
+\]
+because the two endpoint terms contribute $2$ and every interior binomial coefficient is at least $j-2$. Hence
+\begin{equation}\label{eq:B}
+  B_j=2b_j\bigl(1+O(j^{-1})\bigr),\qquad B_j\sim\frac{2\Gamma(j)}{\pi4^j},\qquad B_j\asymp4^{-j}\Gamma(j)\ (j\ge1).
+\end{equation}
+
+\section{A saddle-point formula for the coefficients}\label{sec:saddle}
+
+Put $h=m^{-1/2}$. Cauchy's formula on the circle $x=me^{i\theta}$ gives
+\[
+  a_m=\frac{(m!)^2m^{-m}}{2\pi}\int_{-\pi}^{\pi}\exp\bigl(me^{i\theta}-im\theta\bigr)\,I_0\bigl(2\sqrt m\,e^{i\theta/2}\bigr)^2\,d\theta .
+\]
+Let $S(h)$ be the formal Stirling factor, $m!\sim\sqrt{2\pi m}\,(m/e)^mS(h)$ with
+\[
+  \log S(h)=\sum_{r\ge1}\frac{\mathcal B_{2r}}{2r(2r-1)}\,h^{4r-2},
+\]
+where $\mathcal B_{2r}$ are Bernoulli numbers; the series is used coefficientwise only. For real $u$ define
+\[
+  K(h,u)=\exp\!\left(\frac{e^{ihu}-1-ihu}{h^2}+\frac{u^2}2+\frac{4(e^{ihu/2}-1)}h-2iu-\frac{ihu}2\right),
+\]
+whose apparent singularities at $h=0$ are removable, with $K(0,u)=1$, and set
+\[
+  H_l(j)=\frac1{\sqrt{2\pi}}\int_{\mathbb R}e^{-u^2/2+2iu}\,[h^l]\bigl\{K(h,u)\,e^{-ijhu/2}\bigr\}\,du .
+\]
+
+\begin{proposition}\label{prop:formula}
+As formal power series in $h$,
+\begin{equation}\label{eq:formula}
+  \sum_{N\ge0}d_Nh^N=S(h)^2\sum_{N\ge0}E_Nh^N,\qquad E_N=e^2\sum_{j=0}^NB_j\,H_{N-j}(j).
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+\emph{Normalization.} Substitute $\theta=hu$. The Bessel square contributes the factor $h/(4\pi)$, the differential another factor $h$, and the Cauchy prefactor combined with Stirling's formula leaves $m^me^{-m+4/h}/(4\pi)$. The remaining leading integral equals $\sqrt{2\pi}\,e^{-2}$, which yields exactly $g(m)$. The factor $e^{-ijhu/2}$ comes from $z^{-j}$ with $z=h^{-1}e^{ihu/2}$; the factor $e^{-ihu/2}$ from the Bessel prefactor is included in $K$.
+
+\emph{Fixed-order justification.} Fix an order $M$ and let $\delta=1/8$. Outside $|\theta|\le h^{1-\delta}$, the inequality $1-\cos\theta\ge c\theta^2$ on $[-\pi,\pi]$ bounds the exponential relative to $e^m$ by $e^{-ch^{-2\delta}}$, while the nonnegative Bessel series gives $|I_0(2\sqrt m\,e^{i\theta/2})|\le I_0(2\sqrt m)\le e^{2\sqrt m}$; so the normalized outer integral is smaller than every power of $h$. Inside, $|u|\le h^{-\delta}$, the Bessel expansion through order $M$ is uniform, $|\exp(4(e^{ihu/2}-1)/h)|\le1$ for real $h$, and the Cauchy exponential is bounded by $e^{-cu^2}$ after normalization; thus the Bessel remainder contributes $O(h^{M+1})$.
+
+For the Taylor expansion of $K$ there are constants $c_0,C>0$, independent of real $u$, such that
+\begin{equation}\label{eq:Kbound}
+  |K(w,u)|\le Ce^{u^2/4}\qquad\text{for complex } |w|\le\frac{c_0}{1+|u|} .
+\end{equation}
+Indeed, the first two terms of the exponent combine to $\sum_{k\ge3}(iu)^kw^{k-2}/k!=O(|w||u|^3)$ for $|wu|\le c_0$, which is at most $C_1c_0u^2$; the terms $4(e^{iwu/2}-1)/w-2iu$ are $O(|w|u^2)=O(c_0|u|)$; and the last term is bounded. Choosing $c_0$ small makes the quadratic contribution at most $u^2/8$, and the linear one is absorbed by another $u^2/8$ plus a constant. For fixed $j\le M$ the factor $e^{-ijwu/2}$ is bounded by $e^{jc_0/2}$ on this disc. On the central range $h(1+|u|)/c_0\to0$ uniformly, so Cauchy's estimate shows that truncating at degree $q$ costs at most a constant times $h^{q+1}(1+|u|)^{q+1}e^{u^2/4}$, which after multiplication by $e^{-u^2/2+2iu}$ integrates to $O(h^{q+1})$. The Taylor polynomials may be integrated over $\mathbb R$ with exponentially small error. This proves~\eqref{eq:formula} to every fixed order, i.e.\ the right-hand side of~\eqref{eq:formula} is the Poincar\'e expansion of $a_m/g(m)$.
+
+\emph{Identification with the OEIS coefficients.} The coefficients in \oeis{A395976}/\oeis{A395977} are defined by the same Poincar\'e expansion; they are also characterized by the recurrence~\eqref{eq:rec}. Write $R[f](m)$ for the left minus the right side of~\eqref{eq:rec}. For each fixed $j\ge1$, direct expansion gives
+\begin{equation}\label{eq:Rg}
+  \frac{R[g(m)m^{-j/2}](m)}{g(m)}=-4j\,h^{j+2}+O(h^{j+3}).
+\end{equation}
+(See Section~\ref{sec:pos} for the explicit expansion.) Hence the formal solution of~\eqref{eq:rec} of the form~\eqref{eq:expansion} with $d_0=1$ is unique, and since the actual expansion of $a_m$ satisfies~\eqref{eq:rec} coefficientwise, \eqref{eq:formula} computes the OEIS coefficients.
+\end{proof}
+
+As an independent check, an exact rational implementation of~\eqref{eq:formula} (using the tilted Gaussian moments $M_r=e^2\,(d/dt)^re^{-t^2/2}|_{t=2}$, which satisfy $M_0=1$, $M_1=-2$, $M_{r+1}=-2M_r-rM_{r-1}$) reproduces all 100 published terms $d_0,\dots,d_{99}$ of the OEIS b-files exactly (Section~\ref{sec:numerics}).
+
+\section{A uniform bound on the saddle coefficients}\label{sec:uniform}
+
+We now let $N\to\infty$; fixed-order asymptotics alone do not suffice. By~\eqref{eq:Kbound} and Cauchy's estimate,
+\[
+  \bigl|[h^r]K(h,u)\bigr|\le Cc_0^{-r}(1+|u|)^re^{u^2/4}.
+\]
+Expanding $e^{-ijhu/2}$ separately, the degree-$p$ factor is $(-iju/2)^p/p!$; since $\int(1+|u|)^le^{-u^2/4}du\le CD^l\sqrt{l!}$ (by $(1+|u|)^l\le2^l(1+|u|^l)$ and the Gaussian moment formula), we obtain, with constants independent of $j$ and $l$ (and $0^0=1$),
+\begin{equation}\label{eq:Hbound}
+  |H_l(j)|\le CA^l\sqrt{l!}\sum_{p=0}^l\frac{j^p}{p!} .
+\end{equation}
+For fixed $l$, $H_l(j)$ is a polynomial in $j$ of degree at most $l$; since $K(0,u)=1$, its coefficient of $j^l$ is
+\begin{equation}\label{eq:hl}
+  h_l=\frac1{\sqrt{2\pi}\,l!}\int_{\mathbb R}e^{-u^2/2+2iu}(-iu/2)^l\,du .
+\end{equation}
+
+\section{The large-order limit of the inner sum}\label{sec:limit}
+
+\begin{lemma}\label{lem:EN}
+$E_N/B_N\to e^2$ as $N\to\infty$.
+\end{lemma}
+
+\begin{proof}
+For $j=N-l\ge1$, \eqref{eq:B} gives $B_j/B_N\le C4^l/(j)_l$ with $(j)_l=j(j+1)\cdots(j+l-1)$. For $0\le p\le l$ we have $j^p/(j)_l\le1/(l-p)!$, since the first $p$ factors are at least $j$ and the remaining ones dominate $1,2,\dots,l-p$. With~\eqref{eq:Hbound},
+\begin{equation}\label{eq:major}
+  \left|\frac{B_{N-l}H_l(N-l)}{B_N}\right|\le CA_1^l\sqrt{l!}\sum_{p=0}^l\frac1{p!(l-p)!}\le C\frac{A_2^l}{\sqrt{l!}},
+\end{equation}
+a summable majorant independent of $N$. The endpoint $j=0$, $l=N$ is negligible because $|H_N(0)|/B_N\le CA_3^N\sqrt{N!}/\Gamma(N)\to0$. For fixed $l$, \eqref{eq:B} and~\eqref{eq:hl} give $B_{N-l}H_l(N-l)/B_N\to4^lh_l$. By dominated convergence, and integrating the exponential series termwise in~\eqref{eq:hl} (its absolute sum is bounded by $e^{2|u|}$ times a Gaussian),
+\[
+  \lim_{N\to\infty}\frac{E_N}{B_N}=e^2\sum_{l\ge0}4^lh_l=\frac{e^2}{\sqrt{2\pi}}\int_{\mathbb R}e^{-u^2/2+2iu}e^{-2iu}\,du=e^2. \qedhere
+\]
+\end{proof}
+
+\begin{remark}
+The factor $e^2$ arises because the high-order Bessel terms shift the effective Gaussian oscillation; keeping only the term $j=N$ would miss it.
+\end{remark}
+
+\section{The Stirling factor and the proof of Theorem~\ref{thm:asym}}\label{sec:stirling}
+
+Write $S(h)^2=\sum_{l\ge0}s_lh^l$ with $s_0=1$. The Bernoulli bound $|\mathcal B_{2r}|\le C(2r)!/(2\pi)^{2r}$~\cite[24.11]{DLMF} shows that the coefficient of $h^l$ in $2\log S$ is at most $C^l\sqrt{l!}$, since it vanishes unless $l=4r-2$, and $((2r-2)!)^2\le l!$. Exponentiation preserves such a bound: for a composition $l=l_1+\cdots+l_p$ into positive parts, $\prod l_i!\le l!$, and there are at most $2^{l-1}$ compositions. Hence $|s_l|\le A^l\sqrt{l!}$.
+
+By Lemma~\ref{lem:EN}, $|E_j|\le CB_j$ for $j\ge1$, while $E_0=1$. For $1\le l<N$, using $(N-l)_l\ge l!$,
+\[
+  \frac{|s_lE_{N-l}|}{B_N}\le C\frac{A_4^l}{\sqrt{l!}},
+\]
+and for each fixed $l\ge1$ this ratio tends to $0$ by~\eqref{eq:B}. The term $l=N$ is negligible by the same factorial bound. Dominated convergence and~\eqref{eq:formula} give $d_N/B_N\to e^2$, and~\eqref{eq:B} yields Theorem~\ref{thm:asym}. \qed
+
+\section{Proof of Theorem~\ref{thm:pos}}\label{sec:pos}
+
+\subsection{An exact recurrence for the coefficients}
+
+Substitute $g(m)m^{-j/2}$ into~\eqref{eq:rec}. The ratio $m^rg(m-r)/g(m)$ is the exponential of $(m-r)\log(1-r/m)+r+4(\sqrt{m-r}-\sqrt m)$, and the extra factor is $(1-r/m)^{-j/2}$. Expanding the logarithms with $h^2=1/m$ gives, for $0\le r\le3$,
+\[
+  L_r(j,h)=\sum_{a\ge1}\left(\frac{r^{a+1}}{a(a+1)}+\frac{jr^a}{2a}\right)h^{2a}+\frac4h\bigl(\sqrt{1-rh^2}-1\bigr),
+\]
+an analytic function near $h=0$ (principal square-root branch). After extracting $h^{j-2}$ the coefficients of~\eqref{eq:rec} become the weights
+\[
+  w_0=1,\quad w_1=-(3+h^2-h^4),\quad w_2=(1-h^2)^2(3+h^2),\quad w_3=-(1-2h^2)^2(1-h^2)^2 .
+\]
+Let $C_k(j)=[h^k]\sum_{r=0}^3w_r(h)e^{L_r(j,h)}$, a polynomial in $j$. By finite expansion (verified symbolically in the accompanying scripts) $C_0=C_1=C_2=C_3=0$ identically and $C_4(j)=-4j$, which is~\eqref{eq:Rg}. Collecting the coefficient of $h^{n+2}$ gives
+\begin{equation}\label{eq:drec}
+  d_n=\frac1{4n}\sum_{j=0}^{n-1}d_j\,C_{n-j+4}(j),\qquad n\ge1 .
+\end{equation}
+For $n\ge2$ and $1\le l\le n-1$ put
+\[
+  a_l(n)=\frac{4^lC_{l+4}(n-l)}{4n\prod_{i=1}^l(n-i)} .
+\]
+Multiplying~\eqref{eq:drec} by $4^n/(n-1)!$ yields
+\begin{equation}\label{eq:qrec}
+  q_n=\sum_{l=1}^{n-1}a_l(n)\,q_{n-l}+\frac{4^nC_{n+4}(0)}{4\,n!} .
+\end{equation}
+
+\subsection{Base certificate and induction hypothesis}
+
+Set $R=4/5$, $U=13/10$, $K=20$. Exact rational computation of $d_0,\dots,d_{400}$ from~\eqref{eq:drec} verifies:
+\begin{enumerate}
+  \item $d_6,\dots,d_{400}>0$;
+  \item $q_K\ge1$;
+  \item $Rq_{i-1}\le q_i\le Uq_{i-1}$ for $21\le i\le400$;
+  \item $|q_j|R^{K-j}\le100\,q_K$ for $1\le j<K$.
+\end{enumerate}
+Suppose $n\ge401$ and the ratio bounds hold for all indices $21\le i\le n-1$. Then $q_{n-1}>0$ and, for $K\le j<n$, $U^{-(n-1-j)}\le q_j/q_{n-1}\le R^{-(n-1-j)}$. Combining with item~4 and $q_{n-1}\ge q_KR^{n-1-K}$, for all $1\le j<n$,
+\begin{equation}\label{eq:qratio}
+  |q_j|/q_{n-1}\le100\,R^{-(n-1-j)},
+\end{equation}
+and the factor $100$ may be omitted when $j\ge K$.
+
+\subsection{Exact polynomial certificate for the head}
+
+We show that for every $n\ge400$ the terms $1\le l\le L=26$ of~\eqref{eq:qrec}, divided by $q_{n-1}$, lie in $[81/100,\,119/100]$ whenever the ratios obey the induction bounds. (Here $n-l\ge374\ge K$.) Put $t=n-400\ge0$, $D(t)=(t+400)\prod_{i=1}^{L}(t+400-i)$, and
+\[
+  P_l(t)=4^{l-1}C_{l+4}(t+400-l),\qquad 1\le l\le L,
+\]
+so that $a_l(n)=P_l(t)\prod_{i=l+1}^{L}(t+400-i)/D(t)$. The script checks that all coefficients of each $P_l$ have the same weak sign, so the sign of $a_l(n)$ is constant for $t\ge0$. Since $q_{n-l}/q_{n-1}\in[U^{1-l},R^{1-l}]$, the term $a_l(n)q_{n-l}/q_{n-1}$ is bounded below by $a_l(n)U^{1-l}$ if $P_l\ge0$ and by $a_l(n)R^{1-l}$ otherwise, and above with $R$ and $U$ exchanged. Summing the corresponding numerators gives polynomials $P_{\rm low}$, $P_{\rm high}$ of degree at most~$30$, and the script verifies coefficientwise over $\mathbb Q$ that
+\[
+  P_{\rm low}-\tfrac{81}{100}D\ \text{and}\ \tfrac{119}{100}D-P_{\rm high}\ \text{have nonnegative coefficients}.
+\]
+As $t\ge0$, the head bounds hold simultaneously for all $n\ge400$. This is an exact certificate for an infinite family, not a sample of values.
+
+\subsection{Uniform analytic bound for the tail}
+
+Fix $j\ge0$ and the circle $|h|=(j+9)^{-1/2}\le1/3$, on which $x=r|h|^2\le3/(j+9)\le1/3$. The two even parts of $L_r$ are bounded by $\frac r2\frac x{1-x}\le\frac34$ and $\frac j2\frac x{1-x}\le\frac{3j}{2(j+6)}<\frac32$. Since $1-\sqrt{1-z}$ has nonnegative Taylor coefficients, the square-root part is at most $4r|h|/(1+\sqrt{1-r|h|^2})\le4/(1+\sqrt{2/3})<2.21$. Hence $|L_r|<4.5$. Moreover $\sum_r|w_r(h)|<10$ for $|h|\le1/3$. The defining sum of $C_k$ therefore has modulus below $10e^{4.5}<1024$ on the circle, and Cauchy's estimate gives
+\begin{equation}\label{eq:Ck}
+  |C_k(j)|\le1024\,(j+9)^{k/2}.
+\end{equation}
+With $j=n-l\ge1$ and $\prod_{i=1}^l(n-i)=(j)_l$, \eqref{eq:Ck} gives
+\[
+  |a_l(n)|\le\frac{256(j+9)^2}{n}\,\frac{(4\sqrt{j+9})^l}{(j)_l}\le300\,n\,\frac{(4\sqrt{j+9})^l}{(j)_l}\qquad(n\ge400),
+\]
+since $(n+8)^2/n\le1.05\,n$ for $n\ge400$.
+
+\emph{Near tail: $l\ge27$, $j\ge n/2$.} Here $j\ge K$ and $(j)_l\ge j^l$, so by~\eqref{eq:qratio}
+\[
+  \left|a_l(n)\frac{q_j}{q_{n-1}}\right|\le300\,n\left(\frac{4\sqrt{j+9}}{Rj}\right)^l\le300\,n\left(\frac{7.5}{\sqrt n}\right)^l,
+\]
+because $\sqrt{j+9}/j$ decreases and $10\sqrt{n/2+9}\le7.5\sqrt n$ for $n\ge144$. As $7.5/\sqrt n\le3/8$ and $n(7.5/\sqrt n)^{27}$ decreases, the sum over $l\ge27$ is at most $300\cdot400\,(3/8)^{27}/(1-3/8)$.
+
+\emph{Far tail: $1\le j<n/2$.} Now $(j)_l$ is the product of the $l$ largest integers in $\{1,\dots,n-1\}$, so its geometric mean is at least $((n-1)!)^{1/(n-1)}\ge(n-1)/e>(n-1)/3$. With $j+9<n/2+9$ one checks $4\sqrt{j+9}/(R(n-1)/3)\le12/\sqrt n\le3/5$ for $n\ge400$. Using~\eqref{eq:qratio} and $l>n/2\ge200$, the far tail is at most $100\cdot300\cdot400\,(3/5)^{200}/(1-3/5)$, since $n(12/\sqrt n)^{200}$ decreases.
+
+\emph{The term $j=0$.} By~\eqref{eq:Ck}, $|C_{n+4}(0)|\le1024\cdot3^{n+4}$, and $q_{n-1}\ge R^{n-1-K}$. Dropping the factor $R^{K+1}\le1$ and using $n!>(n/3)^n$, the last term of~\eqref{eq:qrec} divided by $q_{n-1}$ is at most
+\[
+  20736\,\frac{(12/R)^n}{n!}\le20736\left(\frac{45}n\right)^n\le20736\left(\frac9{80}\right)^{400}.
+\]
+Exact rational arithmetic confirms that the three tail bounds sum to less than $1/1000$.
+
+\subsection{Completion}
+
+The head certificate and the tail bound give $0.809\le q_n/q_{n-1}\le1.191$, inside $[4/5,13/10]$, so the induction closes for every $n\ge401$. The base certificate covers $6\le n\le400$, and positivity of $q_n$ for $n\ge401$ follows from the ratio bound. This proves Theorem~\ref{thm:pos}. \qed
+
+\section{Computations and reproducibility}\label{sec:numerics}
+
+The accompanying scripts use exact rational arithmetic for every assertion.
+\begin{itemize}
+  \item \texttt{check\_A395976.py} evaluates the saddle-point formula~\eqref{eq:formula} without using the large-order limit.
+  \item \texttt{check\_A395976\_recurrence.py} evaluates the recurrence~\eqref{eq:drec} with integer-scaled formal exponentials; it shares no code with the previous script.
+  \item \texttt{verify\_bfile.py} confirms that both implementations reproduce all published terms $d_0,\dots,d_{99}$ of the OEIS b-files of \oeis{A395976} and \oeis{A395977}.
+  \item \texttt{certify\_A395976\_positivity.py} runs the base certificate (indices up to 400), the polynomial head certificate and the rational tail bound; it finishes in about 80 seconds on a laptop. The polynomials $C_k$ used in the head certificate were additionally checked to reproduce $d_0,\dots,d_{40}$ through~\eqref{eq:drec}.
+\end{itemize}
+The normalized values below illustrate Theorem~\ref{thm:asym}; the limit is $2e^2/\pi=4.704019211\ldots$. They are not part of the proof.
+
+\begin{center}
+\begin{tabular}{rrrrrrr}
+\toprule
+$j$ & 10 & 20 & 50 & 100 & 200 & 300\\
+\midrule
+$4^jd_j/(j-1)!$ & 4.58266 & 4.64827 & 4.69572 & 4.70200 & 4.70352 & 4.70380\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{Acknowledgements}
+Parts of the derivations and of the verification code were developed with the assistance of AI tools. All arguments were checked by the author, and every computational claim is backed by exact, reproducible scripts. The result has not yet been peer-reviewed.
+
+\begin{thebibliography}{9}
+
+\bibitem{OEIS}
+OEIS Foundation Inc., \emph{The On-Line Encyclopedia of Integer Sequences}, \url{https://oeis.org}; entries \oeis{A336293}, \oeis{A395976}, \oeis{A395977}.
+
+\bibitem{DLMF}
+F.~W.~J. Olver et al. (eds.), \emph{NIST Digital Library of Mathematical Functions}, \url{https://dlmf.nist.gov}; \S\S5.11, 10.17, 10.40, 24.11.
+
+\end{thebibliography}
+
+\end{document}
